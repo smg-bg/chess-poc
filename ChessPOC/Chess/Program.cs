@@ -60,21 +60,25 @@ namespace Chess
 
         #endregion
 
+        #region Program Entry Point (Main Method)
+
         public static void Main(string[] args)
         {
             Console.OutputEncoding = Encoding.Unicode;
 
+            // declare shared variables
             Cell[,] board = InitBoard();
+
             Player currentPlayer = Player.Player1;
             bool isPlayer1Castling = false, isPlayer2Castling = false;
 
-          
             while(true)
             {
                 DrawBoard(board);
-       
+                WriteGeneralHelp();
+
                 Command command;
-                if (!NextCommand(currentPlayer, out command))
+                if (!TryGetCommand(currentPlayer, out command))
                     continue;
 
                 switch (command.Action)
@@ -119,43 +123,176 @@ namespace Chess
             Console.ReadKey();
         }
 
-        private static bool Castling(Player currentPlayer, CastlingType castlingType, Cell[,] board)
-        {
-            // TODO: implement later
-            return true;
-        }
+        #endregion
 
-        private static bool IsCheckmate()
-        {
-            // TODO: implement later
-            return false;
-        }
+        #region Game Over Conditions
 
-        private static bool IsStalemate()
+        public static bool IsCheckmate()
         {
             // TODO: implement later
             return false;
         }
 
-        private static void Quit()
-        {
-            // closes the application with Error Code 0,
-            // which means Success (if not 0, that indicates a problem)
-            Environment.Exit(0);
-        }
-
-        private static void Undo()
+        public static bool IsStalemate()
         {
             // TODO: implement later
+            return false;
         }
 
-        private static bool TryMove(Player currentPlayer, Cell[,] board, 
+        #endregion
+
+        #region Parse and Validate User Commands (translate plain text input to structure) 
+
+        public static bool TryGetCommand(Player currentPlayer, out Command command)
+        {
+            Console.Write($"{currentPlayer}:");
+
+            string input = Console.ReadLine().Trim().ToLower();
+
+            // check if any input is provided
+            if (string.IsNullOrWhiteSpace(input))
+            {
+                WriteError("Unrecognized command!");
+                WriteGeneralHelp();
+
+                command = default(Command);
+                return false;
+            }
+
+            // get the first letter of the command
+            char cmd = Convert.ToChar(input.Substring(0, 1));
+
+            if (cmd == 'q' && input.Length == 1)
+            {
+                command = new Command() { Action = cmd };
+                return true;
+            }
+
+            if (cmd == 'u' && input.Length == 1)
+            {
+                command = new Command() { Action = cmd };
+                return true;
+            }
+
+            if (cmd == 'm' && input.Length > 1)
+            {
+                // we expect the move command with 2 arguments (ex. m C7 C6)
+                // 1. we get everything after the 'm' (substring starting from index 1)
+                // 2. we will split by space
+                string[] parameters = input.Substring(1).Trim().Split(' ');
+
+                // 3. we expect this to return exactly 2 strings (ex. A1 and A4)
+                // 4. we expect each of those 2 strings to be exactly 2 characters  w
+                if (parameters.Length != 2 ||
+                    parameters[0].Length != 2 ||
+                    parameters[1].Length != 2)
+                {
+                    WriteError("Unrecognized command!");
+                    WriteError("Expects M XY XY (ex. M A2 A3)");
+
+                    command = default(Command);
+                    return false;
+                }
+
+                // 5. we expect those 2 characters (e.g. address) to be letter and digit
+                if (!(char.IsLetter(parameters[0][0]) || char.IsDigit(parameters[0][1]))
+                    || !(char.IsLetter(parameters[1][0]) || char.IsDigit(parameters[1][1])))
+                {
+                    WriteError("Unrecognized command!");
+                    WriteError("Expects M XY XY (ex. M A2 A3)");
+
+                    command = default(Command);
+                    return false;
+                }
+
+                // 6. we expect the letter to be one of A, B, C, D, E, F, G, H
+                if (!(parameters[0][0] >= 'a' && parameters[0][0] <= 'h') ||
+                    !(parameters[1][0] >= 'a' && parameters[1][0] <= 'h'))
+                {
+                    WriteError("Unrecognized command!");
+                    WriteError("Expects M XY XY (ex. M A2 A3)");
+
+                    command = default(Command);
+                    return false;
+                }
+
+                // 7. we expect the digit to be 1, 2, 3, 4, 5, 6, 7, 8
+                if (!(parameters[0][1] >= '1' && parameters[0][1] <= '8') ||
+                    !(parameters[1][1] >= '1' && parameters[1][1] <= '8'))
+                {
+                    WriteError("Unrecognized command!");
+                    WriteError("Expects M XY XY (ex. M A2 A3)");
+
+                    command = default(Command);
+                    return false;
+                }
+
+                CellAddress from = new CellAddress() { X = parameters[0][0], Y = byte.Parse(parameters[0][1].ToString()) };
+                CellAddress to = new CellAddress() { X = parameters[1][0], Y = byte.Parse(parameters[1][1].ToString()) };
+
+                command = new Command() { Action = cmd, From = from, To = to };
+                return true;
+            }
+
+            // ex. `c k` or `c q`
+            if (cmd == 'c')
+            {
+                string[] parts = input.Split(' ');
+
+                // check if there only two letters/words divided by space
+                if (parts.Length != 2)
+                {
+                    WriteError("Unrecognized command!");
+                    WriteError("Expects [C]astling [K]ing or [C]astling [Q]ueen");
+
+                    command = default(Command);
+                    return false;
+                }
+
+                // check that we have two parts that are 1 letter long
+                // and the second parts is either q or k
+                if (parts[0].Length == 1 && parts[1].Length == 1
+                    && (parts[1][0] == 'q' || parts[1][0] == 'k'))
+                {
+                    if (parts[1][0] == 'q')
+                    {
+                        command = new Command() { Action = cmd, CastlingType = CastlingType.Queen };
+                        return true;
+                    }
+                    else if (parts[1][0] == 'k')
+                    {
+                        command = new Command() { Action = cmd, CastlingType = CastlingType.King };
+                        return true;
+                    }
+                }
+
+                WriteError("Unrecognized command!");
+                WriteError("Expects [C]astling [K]ing or [C]astling [Q]ueen");
+
+                command = default(Command);
+                return false;
+            }
+
+            // if we reach this point, we don't know how to handle 
+            // the command 
+            WriteError("Unrecognized command!");
+            WriteGeneralHelp();
+
+            command = default(Command);
+            return false;
+        }
+
+        #endregion
+
+        #region Commands (Move, Castling, Undo, Quit)
+
+        public static bool TryMove(Player currentPlayer, Cell[,] board,
             CellAddress from, CellAddress to)
         {
             // substracting characters will return a number, because each 
             // character is represented as number / position in Unicode table
-            Cell fromCell = board[from.Y, char.ToLower(from.X) - 'a'];
-            Cell toCell = board[to.Y, char.ToLower(to.X) - 'a'];
+            Cell fromCell = board[board.GetLength(0) - from.Y, char.ToLower(from.X) - 'a'];
+            Cell toCell = board[board.GetLength(0) - to.Y, char.ToLower(to.X) - 'a'];
 
             // check if the cell from which we are trying 
             // to move a figure contains any figure             
@@ -194,135 +331,75 @@ namespace Chess
             return false;
         }
 
-        private static bool MoveQueen(Player currentPlayer, Cell[,] board, CellAddress from, CellAddress to)
+        public static bool Castling(Player currentPlayer, CastlingType castlingType, Cell[,] board)
+        {
+            // TODO: implement later
+            return true;
+        }
+
+        public static void Undo()
+        {
+            // TODO: implement later
+        }
+
+        public static void Quit()
+        {
+            // closes the application with Error Code 0,
+            // which means Success (if not 0, that indicates a problem)
+            Environment.Exit(0);
+        }
+
+        #endregion
+
+        #region Move Operations (6 different methods for each figure type)
+
+        public static bool MoveQueen(Player currentPlayer, Cell[,] board, CellAddress from, CellAddress to)
         {
             WriteError("Moving the Queen is not implemented.");
 
             return false;
         }
 
-        private static bool MoveKing(Player currentPlayer, Cell[,] board, CellAddress from, CellAddress to)
+        public static bool MoveKing(Player currentPlayer, Cell[,] board, CellAddress from, CellAddress to)
         {
             WriteError("Moving the King is not implemented.");
 
             return false;
         }
 
-        private static bool MoveKnight(Player currentPlayer, Cell[,] board, CellAddress from, CellAddress to)
+        public static bool MoveKnight(Player currentPlayer, Cell[,] board, CellAddress from, CellAddress to)
         {
             WriteError("Moving the Knight is not implemented.");
 
             return false;
         }
 
-        private static bool MoveBishop(Player currentPlayer, Cell[,] board, CellAddress from, CellAddress to)
+        public static bool MoveBishop(Player currentPlayer, Cell[,] board, CellAddress from, CellAddress to)
         {
             WriteError("Moving the Bishop is not implemented.");
 
             return false;
         }
 
-        private static bool MoveRook(Player currentPlayer, Cell[,] board, CellAddress from, CellAddress to)
+        public static bool MoveRook(Player currentPlayer, Cell[,] board, CellAddress from, CellAddress to)
         {
             WriteError("Moving the Rook is not implemented.");
 
             return false;
         }
 
-        private static bool MovePawn(Player currentPlayer, Cell[,] board, CellAddress from, CellAddress to)
+        public static bool MovePawn(Player currentPlayer, Cell[,] board, CellAddress from, CellAddress to)
         {
             WriteError("Moving the Pawn is not implemented.");
 
             return false;
         }
 
-        private static bool NextCommand(Player currentPlayer, out Command command)
-        {
-            Console.Write($"{currentPlayer}:");
+        #endregion
 
-            string input = Console.ReadLine().Trim();
+        #region Board Drawing
 
-            if (string.IsNullOrWhiteSpace(input))
-            {
-                WriteError("Unrecognized command!");
-                WriteError("Expects [M]ove, [U]ndo, [C]astling [K]ing, [C]astling [Q]ueen or [Q]uit");
-
-                command = default(Command);
-                return false;
-            }
-
-            var cmd = Convert.ToChar(input.Substring(0, 1));
-
-            if (cmd == 'q' && input.Length == 1)
-            {
-                command = new Command() { Action = 'q' };
-                return true;
-            }
-
-            if (cmd == 'u' && input.Length == 1)
-            {
-                command = new Command() { Action = 'u' };
-                return true;
-            }
-
-            if (cmd == 'm' /* TODO: more condition for homework :) */)
-            {
-                // TODO: parsing (splitting the string) to be implemented for homework :)
-                CellAddress from = new CellAddress() { X = 'D', Y = 1 };
-                CellAddress to = new CellAddress() { X = 'D', Y = 2 };
-
-                command = new Command() { Action = cmd, From = from, To = to };
-                return true;
-            }
-
-            if (cmd == 'c')
-            {
-                string[] parts = input.Split(' ');
-
-                if (parts.Length != 2)
-                {
-                    WriteError("Unrecognized command!");
-                    WriteError("Expects [C]astling [K]ing or [C]astling [Q]ueen");
-                    command = default(Command);
-                    return false;
-                }
-
-                if (parts[1].Length == 1 && (parts[1][0] == 'q' || parts[1][0] == 'k'))
-                {
-                    if (parts[1][0] == 'q')
-                    {
-                        command = new Command() { Action = cmd, CastlingType = CastlingType.Queen };
-                        return true;
-                    }
-                    else if (parts[1][0] == 'k')
-                    {
-                        command = new Command() { Action = cmd, CastlingType = CastlingType.King };
-                        return true;
-                    }
-                }
-
-                WriteError("Unrecognized command!");
-                WriteError("Expects [C]astling [K]ing or [C]astling [Q]ueen");
-                command = default(Command);
-                return false;
-            }
-
-            WriteError("Unrecognized command!");
-            WriteError("Expects [M]ove, [U]ndo, [C]astling [K]ing, [C]astling [Q]ueen or [Q]uit");
-
-            command = default(Command);
-            return false;
-        }
-
-        private static void WriteError(string msg)
-        {
-            var originalColor = Console.ForegroundColor;
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine(msg);
-            Console.ForegroundColor = originalColor;
-        }
-
-        private static void DrawBoard(Cell[,] board)
+        public static void DrawBoard(Cell[,] board)
         {
             // represents a map / relation between the enumeration 
             // and a one letter presentation when we print it on screen
@@ -343,13 +420,25 @@ namespace Chess
                 // each row has top border
                 Console.WriteLine("  #################################");
 
-                Console.Write($"{board.GetLength(1) - i} ");
+                // reverse row indexes to match real world chess :)
+                Console.Write($"{board.GetLength(0) - i} ");
+
                 for (int j = 0; j < board.GetLength(1); j++)
                 {
-                    Console.Write("# {0} ", figureMap[board[i,j].Figure]);
+                    Console.Write("#");
+
+                    // TODO: change background color as well
+                    var currentForeground = Console.ForegroundColor;
+
+                    Console.ForegroundColor = board[i, j].Player == 
+                        Player.Player1 ? ConsoleColor.Red : ConsoleColor.Blue;
+
+                    Console.Write(" {0} ", figureMap[board[i,j].Figure]);
+
+                    Console.ForegroundColor = currentForeground;
                 }
 
-                Console.WriteLine($"# {board.GetLength(1) - i}");
+                Console.WriteLine($"# {board.GetLength(0) - i}");
             }
 
             // footer (bottom line)
@@ -357,115 +446,95 @@ namespace Chess
             Console.WriteLine("    A   B   C   D   E   F   G   H");
         }
 
-        private static Cell[,] InitBoard()
+        #endregion
+
+        #region Initialize Board
+
+        public static Cell[,] InitBoard()
         {
             var initialBoard = new Cell[8, 8];
 
-            // add player 1 figures
-            initialBoard[0, 0] = new Cell
-            {
-                Player = Player.Player1,
-                Figure = Figure.Rook
-            };
-            initialBoard[0, 1] = new Cell
-            {
-                Player = Player.Player1,
-                Figure = Figure.Knight
-            };
-            initialBoard[0, 2] = new Cell
-            {
-                Player = Player.Player1,
-                Figure = Figure.Bishop
-            };
-            initialBoard[0, 3] = new Cell
-            {
-                Player = Player.Player1,
-                Figure = Figure.King
-            };
-            initialBoard[0, 4] = new Cell
-            {
-                Player = Player.Player1,
-                Figure = Figure.Queen
-            };
-            initialBoard[0, 5] = new Cell
-            {
-                Player = Player.Player1,
-                Figure = Figure.Bishop
-            };
-            initialBoard[0, 6] = new Cell
-            {
-                Player = Player.Player1,
-                Figure = Figure.Knight
-            };
-            initialBoard[0, 7] = new Cell
-            {
-                Player = Player.Player1,
-                Figure = Figure.Rook
-            };
+            int pawnsRowPlayer1 = 1, pawnsRowPlayer2 = 6;
 
-            // add player 1 pawns
-            for (int row = 1, col = 0; col < initialBoard.GetLength(0); col++)
-            {
-                initialBoard[row, col] = new Cell
-                {
-                    Player = Player.Player1,
-                    Figure = Figure.Pawn
-                };
-            }
+            InitPlayerFigures(initialBoard, Player.Player1, pawnsRowPlayer1);
+            InitPlayerFigures(initialBoard, Player.Player2, pawnsRowPlayer2);
+            
+            return initialBoard;
+        }
 
-            // add player 2 figures
-            initialBoard[7, 0] = new Cell
+        public static void InitPlayerFigures(Cell[,] board, Player player, int pawnsRow)
+        {
+            var backRow = (player == Player.Player1) ? pawnsRow - 1 : pawnsRow + 1;
+
+            board[backRow, 0] = new Cell
             {
-                Player = Player.Player1,
+                Player = player,
                 Figure = Figure.Rook
             };
-            initialBoard[7, 1] = new Cell
+            board[backRow, 1] = new Cell
             {
-                Player = Player.Player1,
+                Player = player,
                 Figure = Figure.Knight
             };
-            initialBoard[7, 2] = new Cell
+            board[backRow, 2] = new Cell
             {
-                Player = Player.Player1,
+                Player = player,
                 Figure = Figure.Bishop
             };
-            initialBoard[7, 3] = new Cell
+            board[backRow, 3] = new Cell
             {
-                Player = Player.Player1,
-                Figure = Figure.Queen
+                Player = player,
+                Figure = (player == Player.Player1) ? Figure.Queen : Figure.King
             };
-            initialBoard[7, 4] = new Cell
+            board[backRow, 4] = new Cell
             {
-                Player = Player.Player1,
-                Figure = Figure.King
+                Player = player,
+                Figure = (player != Player.Player1) ? Figure.Queen : Figure.King
             };
-            initialBoard[7, 5] = new Cell
+            board[backRow, 5] = new Cell
             {
-                Player = Player.Player1,
+                Player = player,
                 Figure = Figure.Bishop
             };
-            initialBoard[7, 6] = new Cell
+            board[backRow, 6] = new Cell
             {
-                Player = Player.Player1,
+                Player = player,
                 Figure = Figure.Knight
             };
-            initialBoard[7, 7] = new Cell
+            board[backRow, 7] = new Cell
             {
-                Player = Player.Player1,
+                Player = player,
                 Figure = Figure.Rook
             };
 
             // add player 2 pawns
-            for (int row = 6, col = 0; col < initialBoard.GetLength(0); col++)
+            for (int row = pawnsRow, col = 0; col < board.GetLength(0); col++)
             {
-                initialBoard[row, col] = new Cell
+                board[row, col] = new Cell
                 {
-                    Player = Player.Player2,
+                    Player = player,
                     Figure = Figure.Pawn
                 };
             }
-
-            return initialBoard;
         }
+
+        #endregion
+
+        #region Helper Methods for Console Output
+
+        public static void WriteGeneralHelp()
+        {
+            WriteError("Expects [M]ove, [U]ndo, [C]astling [K]ing, [C]astling [Q]ueen or [Q]uit");
+        }
+
+        public static void WriteError(string msg)
+        {
+            var originalColor = Console.ForegroundColor;
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine(msg);
+            Console.ForegroundColor = originalColor;
+        }
+
+        #endregion 
     }
 }
