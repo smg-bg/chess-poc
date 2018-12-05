@@ -1,1 +1,1 @@
-# Sample code and apps for the .NET Framework and C# course (October 2018)
+# Pragmatic C# and .NET Course October 2018 Lecture 6 & 7
