@@ -1,1 +1,3 @@
-# Pragmatic C# and .NET Course October 2018 Lecture 6 & 7
+# Chess POC
+
+Heavily simplified Chess game written in C# as console application and only with procedural programming concepts.
